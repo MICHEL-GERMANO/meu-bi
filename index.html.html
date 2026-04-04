@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>BI Corporativo | 11 Unidades - Multiavas</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --sidebar-bg: #0f172a; --accent: #3b82f6; --bg-light: #f8fafc; }
+        body { background: var(--bg-light); font-family: 'Inter', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 260px; background: var(--sidebar-bg); color: white; padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
+        .main-content { flex: 1; overflow-y: auto; padding: 30px; }
+        .nav-link { color: #94a3b8; padding: 10px; border-radius: 8px; margin-bottom: 5px; cursor: pointer; text-align: left; border: none; background: none; width: 100%; transition: 0.3s; }
+        .nav-link:hover, .nav-link.active { background: #1e293b; color: white; border-left: 4px solid var(--accent); }
+        .card-chart { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px; height: 350px; }
+        .grid-6 { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        h6 { font-size: 0.7rem; text-transform: uppercase; color: #64748b; margin-top: 20px; font-weight: 800; letter-spacing: 1px; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; display: none; }
+    </style>
+</head>
+<body>
+
+<div id="loader" class="loading-overlay"><h3>Atualizando dados...</h3></div>
+
+<div class="sidebar">
+    <h4 class="text-info mb-4">BI Manager</h4>
+    
+    <h6>Unidades</h6>
+    <div id="unitButtons"></div>
+
+    <h6>Visão Comparativa (Rede)</h6>
+    <div id="kpiButtons">
+        <button class="nav-link" onclick="setMode('kpi', 'ativos')">👥 Ativos Adimplentes</button>
+        <button class="nav-link" onclick="setMode('kpi', 'inadimplencia')">⚠️ Inadimplência</button>
+        <button class="nav-link" onclick="setMode('kpi', 'cancelamentos')">🚫 Cancelamentos</button>
+        <button class="nav-link" onclick="setMode('kpi', 'vendas')">📈 Vendas</button>
+        <button class="nav-link" onclick="setMode('kpi', 'faturamento')">💰 Fat. Vendas</button>
+        <button class="nav-link" onclick="setMode('kpi', 'visitas')">📍 Visitas</button>
+        <button class="nav-link" onclick="setMode('kpi', 'nps')">⭐ NPS</button>
+    </div>
+    
+    <button class="btn btn-sm btn-outline-info mt-4" onclick="loadAllSheets()">🔄 Sincronizar Tudo</button>
+</div>
+
+<div class="main-content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 id="pageTitle">Carregando...</h2>
+            <p class="text-muted small">Dados puxados em tempo real do Google Sheets</p>
+        </div>
+    </div>
+    <div id="dashboardGrid" class="grid-6"></div>
+</div>
+
+<script>
+    // --- PASSO IMPORTANTE: COLOQUE OS SEUS LINKS CSV DE CADA ABA AQUI ---
+    const sheetURLs = {
+        ativos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=0&single=true&output=csv",
+        inadimplencia: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=1400644220&single=true&output=csv",
+        cancelamentos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=631605304&single=true&output=csv",
+        vendas: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=495578225&single=true&output=csv",
+        faturamento: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=2107009157&single=true&output=csv",
+        visitas: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=1063504497&single=true&output=csv",
+        nps: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=546277474&single=true&output=csv"
+    };
+
+    const kpiMeta = {
+        ativos: { label: "Ativos Adimplentes", color: "#3b82f6" },
+        inadimplencia: { label: "Inadimplência", color: "#ef4444" },
+        cancelamentos: { label: "Cancelamentos", color: "#f59e0b" },
+        vendas: { label: "Vendas", color: "#10b981" },
+        faturamento: { label: "Faturamento", color: "#8b5cf6" },
+        visitas: { label: "Visitas", color: "#64748b" },
+        nps: { label: "NPS", color: "#06b6d4" }
+    };
+
+    let fullData = {}; 
+    let currentMode = 'unit'; 
+    let currentFocus = '';
+    let charts = [];
+
+    async function loadAllSheets() {
+        document.getElementById('loader').style.display = 'flex';
+        for (const [kpi, url] of Object.entries(sheetURLs)) {
+            try {
+                const response = await fetch(url);
+                const csv = await response.text();
+                fullData[kpi] = parseCSV(csv);
+            } catch (e) { console.error("Erro na aba: " + kpi); }
+        }
+        
+        const firstUnit = Object.keys(fullData.ativos || {})[0];
+        if (firstUnit) {
+            setupUnitButtons();
+            setMode('unit', firstUnit);
+        }
+        document.getElementById('loader').style.display = 'none';
+    }
+
+    function parseCSV(csv) {
+        const rows = csv.trim().split('\n').map(r => r.split(','));
+        const data = {};
+        rows.forEach(row => {
+            const unitName = row[0].trim();
+            const values = row.slice(1).map(v => parseFloat(v) || 0);
+            if (unitName && unitName !== "Unidade") data[unitName] = values;
+        });
+        return data;
+    }
+
+    function setupUnitButtons() {
+        const container = document.getElementById('unitButtons');
+        container.innerHTML = '';
+        const units = Object.keys(fullData.ativos);
+        units.forEach(u => {
+            container.innerHTML += `<button class="nav-link unit-btn" onclick="setMode('unit', '${u}', this)">${u}</button>`;
+        });
+    }
+
+    function setMode(mode, focus, btn) {
+        currentMode = mode;
+        currentFocus = focus;
+        document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        
+        document.getElementById('pageTitle').innerText = mode === 'unit' ? `Unidade: ${focus}` : `KPI: ${kpiMeta[focus].label}`;
+        renderDashboard();
+    }
+
+    function renderDashboard() {
+        const grid = document.getElementById('dashboardGrid');
+        grid.innerHTML = '';
+        charts.forEach(c => c.destroy());
+        charts = [];
+
+        if (currentMode === 'unit') {
+            Object.keys(kpiMeta).forEach(kpiKey => {
+                const data = (fullData[kpiKey] && fullData[kpiKey][currentFocus]) ? fullData[kpiKey][currentFocus] : [];
+                createChartCard(grid, kpiMeta[kpiKey].label, data, kpiMeta[kpiKey].color);
+            });
+        } else {
+            Object.keys(fullData[currentFocus] || {}).forEach(unitName => {
+                const data = fullData[currentFocus][unitName];
+                createChartCard(grid, unitName, data, kpiMeta[currentFocus].color);
+            });
+        }
+    }
+
+    function createChartCard(container, title, data, color) {
+        const div = document.createElement('div');
+        div.className = 'card-chart';
+        div.innerHTML = `<canvas id="chart-${title}"></canvas>`;
+        container.appendChild(div);
+
+        const ctx = document.getElementById(`chart-${title}`).getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map((_, i) => i + 1),
+                datasets: [{
+                    label: title,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + '15',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: title } } }
+        });
+        charts.push(chart);
+    }
+
+    window.onload = loadAllSheets;
+</script>
+</body>
+</html>

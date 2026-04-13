@@ -148,16 +148,22 @@
 
         const obj = {};
         // Começa na Linha 3 (Índice 2) onde estão os nomes das unidades e valores
-        rows.slice(2).forEach(r => {
-            const name = r[0].trim();
-            if(!name || name.toLowerCase() === "data" || name.toLowerCase() === "março") return;
-            
-            obj[name] = r.slice(1).map((v, i) => ({
-                month: monthHeader[i],
-                date: dateHeader[i],
-                value: parseFloat(v.replace(/[R$\s.]/g, '').replace(',', '.')) || 0
-            }));
+       rows.slice(2).forEach(r => {
+        const name = r[0] ? r[0].trim() : "";
+        
+        // Esta linha abaixo é o segredo: ela ignora linhas vazias ou de totais
+        if(!name || name === "" || name.toLowerCase().includes("total") || name.toLowerCase().includes("data")) return;
+        
+        obj[name] = r.slice(1).map((v, i) => {
+            // Aqui ele limpa os valores para o gráfico não bugar
+            let cleanValue = v ? v.replace(/[R$\s.]/g, '').replace(',', '.') : "0";
+            return {
+                month: monthHeader[i] || "Sem Mês",
+                date: dateHeader[i] || "",
+                value: parseFloat(cleanValue) || 0
+            };
         });
+    });
         return obj;
     }
 

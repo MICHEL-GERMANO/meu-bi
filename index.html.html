@@ -94,25 +94,49 @@
     }
 
     function parse(csv) {
-        const lines = csv.trim().split('\n');
-        const rows = lines.map(line => line.split(','));
-        const monthHeader = rows[0].slice(1).map(h => h.trim());
-        const dateHeader = rows[1].slice(1).map(d => d.trim());
-        
-        monthHeader.forEach(m => { if(m && !months.includes(m)) months.push(m); });
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) return {};
 
-        const obj = {};
-        rows.slice(2).forEach(r => {
-            const name = r[0] ? r[0].trim() : "";
-            if(!name || name.toLowerCase().includes("total") || name.toLowerCase() === "data") return;
-            obj[name] = r.slice(1).map((v, i) => ({
+    // Detecta o separador: conta quantas vírgulas vs ponto-e-vírgulas existem na primeira linha
+    const commaCount = (lines[0].match(/,/g) || []).length;
+    const semiCount = (lines[0].match(/;/g) || []).length;
+    const sep = semiCount > commaCount ? ';' : ',';
+
+    const rows = lines.map(line => line.split(sep));
+    
+    // Captura os cabeçalhos das linhas 1 e 2
+    const monthHeader = rows[0].slice(1).map(h => h.trim());
+    const dateHeader = rows[1].slice(1).map(d => d.trim());
+    
+    monthHeader.forEach(m => { 
+        if(m && m !== "" && !months.includes(m)) months.push(m); 
+    });
+
+    const obj = {};
+    // Lê as unidades a partir da Linha 3
+    rows.slice(2).forEach(r => {
+        let name = r[0] ? r[0].trim() : "";
+        
+        // Ignora linhas de total, data ou vazias
+        if(!name || name.toLowerCase().includes("total") || name.toLowerCase() === "data") return;
+        
+        obj[name] = r.slice(1).map((v, i) => {
+            if (!v) return { month: monthHeader[i] || "", date: dateHeader[i] || "", value: 0 };
+            
+            // Limpa R$, espaços e converte formato decimal (ex: 1.200,50 -> 1200.50)
+            let val = v.replace(/[R$\s]/g, '');
+            if (val.includes(',') && val.includes('.')) val = val.replace(/\./g, '').replace(',', '.');
+            else val = val.replace(',', '.');
+
+            return {
                 month: monthHeader[i] || "",
                 date: dateHeader[i] || "",
-                value: parseFloat(v.replace(/[R$\s.]/g, '').replace(',', '.')) || 0
-            }));
+                value: parseFloat(val) || 0
+            };
         });
-        return obj;
-    }
+    });
+    return obj;
+}
 
     function updateMonthSelector() {
         const select = document.getElementById('monthFilter');

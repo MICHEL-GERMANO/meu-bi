@@ -2,13 +2,12 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard BI - Operação</title>
+    <title>BI OPERAÇÃO - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f8fafc; font-family: sans-serif; display: flex; height: 100vh; margin: 0; }
         
-        /* Menu Lateral Laranja Escuro */
         .sidebar { 
             width: 250px; 
             background: #c2410c; 
@@ -20,10 +19,9 @@
         }
         
         .main { flex: 1; padding: 20px; overflow-y: auto; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
         .card-chart { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 350px; }
         
-        /* Estilo dos Links do Menu */
         .nav-link { 
             color: #ffffff; 
             cursor: pointer; 
@@ -36,10 +34,9 @@
         }
         .nav-link:hover, .active { background: #9a3412; color: white; font-weight: bold; }
         
-        h4 { font-weight: bold; letter-spacing: 1px; margin-bottom: 25px; border-bottom: 1px solid #ea580c; padding-bottom: 10px; }
-        h6 { color: #fdba74; font-size: 0.7rem; text-transform: uppercase; margin-top: 20px; margin-bottom: 10px; }
+        h4 { font-weight: bold; letter-spacing: 1px; margin-bottom: 25px; border-bottom: 1px solid #ea580c; padding-bottom: 10px; text-transform: uppercase; }
+        h6 { color: #fdba74; font-size: 0.7rem; text-transform: uppercase; margin-top: 20px; margin-bottom: 10px; opacity: 0.8; }
         
-        /* Estilo do Filtro */
         .filter-container {
             display: flex;
             justify-content: space-between;
@@ -50,7 +47,7 @@
             margin-bottom: 25px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        select.form-select { width: 220px; border-color: #c2410c; }
+        select.form-select { width: 220px; border-color: #c2410c; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -75,19 +72,20 @@
     <div class="filter-container">
         <h2 id="viewTitle" style="margin: 0; font-size: 1.5rem; color: #1e293b;">Carregando...</h2>
         <select id="monthFilter" class="form-select" onchange="render()">
-            <option value="all">Todos os Meses</option>
+            <option value="all">Ver Tudo (Ano)</option>
         </select>
     </div>
     <div id="chartGrid" class="grid"></div>
 </div>
 
 <script>
+    // COLOQUE SEUS LINKS CSV ABAIXO:
     const urls = {
         ativos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=0&single=true&output=csv",
         inadimplencia: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=1400644220&single=true&output=csv",
-        cancelamentos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=631605304&single=true&output=csv",
         vendas: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=495578225&single=true&output=csv",
-        faturamento: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=495578225&single=true&output=csv",
+        faturamento: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=2107009157&single=true&output=csv",
+        cancelamentos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=631605304&single=true&output=csv",
         visitas: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=1063504497&single=true&output=csv",
         nps: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=546277474&single=true&output=csv"
     };
@@ -111,7 +109,153 @@
     async function init() {
         try {
             for (let k in urls) {
-                if(urls[k] === "LINK_AQUI") continue;
+                // Só tenta carregar se o link não for o texto padrão
+                if(!urls[k] || urls[k].includes("LINK_AQUI")) continue;
+                
                 const res = await fetch(urls[k]);
+                if (!res.ok) throw new Error("Falha no link: " + k);
                 const text = await res.text();
-                store[k] = parse(text
+                store[k] = parse(text);
+            }
+            
+            // Define a primeira unidade disponível para abrir o dashboard
+            const unidadesDisponiveis = Object.keys(store.ativos || {});
+            if(unidadesDisponiveis.length > 0) {
+                renderMenu();
+                updateMonthSelector();
+                setMode('unit', unidadesDisponiveis[0]);
+            } else {
+                document.getElementById('viewTitle').innerText = "Configure os links no código";
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById('viewTitle').innerText = "Erro ao carregar planilhas";
+        }
+    }
+
+    function parse(csv) {
+        const rows = csv.trim().split('\n').map(r => r.split(','));
+        
+        // Linha 1 (Índice 0): Nome do Mês (Março, Abril...)
+        const monthHeader = rows[0].slice(1).map(h => h.trim());
+        // Linha 2 (Índice 1): Data (01/03, 02/03...)
+        const dateHeader = rows[1].slice(1).map(d => d.trim());
+        
+        // Alimenta a lista única de meses para o filtro
+        monthHeader.forEach(m => {
+            if(m && m !== "" && !months.includes(m)) months.push(m);
+        });
+
+        const obj = {};
+        // Começa na Linha 3 (Índice 2) onde estão os nomes das unidades e valores
+        rows.slice(2).forEach(r => {
+            const name = r[0].trim();
+            if(!name || name.toLowerCase() === "data" || name.toLowerCase() === "março") return;
+            
+            obj[name] = r.slice(1).map((v, i) => ({
+                month: monthHeader[i],
+                date: dateHeader[i],
+                value: parseFloat(v.replace(/[R$\s.]/g, '').replace(',', '.')) || 0
+            }));
+        });
+        return obj;
+    }
+
+    function updateMonthSelector() {
+        const select = document.getElementById('monthFilter');
+        select.innerHTML = '<option value="all">Ver Tudo (Ano)</option>';
+        months.forEach(m => {
+            if(m) select.innerHTML += `<option value="${m}">${m}</option>`;
+        });
+    }
+
+    function renderMenu() {
+        const div = document.getElementById('unitLinks');
+        div.innerHTML = '';
+        // Usa a aba de Ativos como base para criar o menu de unidades
+        const unidades = Object.keys(store.ativos || {});
+        unidades.forEach(u => {
+            div.innerHTML += `<a class="nav-link unit-link" onclick="setMode('unit', '${u}')">${u}</a>`;
+        });
+    }
+
+    function setMode(mode, focus) {
+        currentMode = mode;
+        currentFocus = focus;
+        document.getElementById('viewTitle').innerText = mode === 'unit' ? focus : config[focus].label;
+        
+        // Estética: Remove destaque de todos e coloca no selecionado
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        // Busca o elemento que foi clicado ou o correspondente ao focus
+        const links = document.querySelectorAll('.nav-link');
+        links.forEach(l => {
+            if(l.innerText === focus || l.innerText === config[focus]?.label) l.classList.add('active');
+        });
+        
+        render();
+    }
+
+    function render() {
+        const grid = document.getElementById('chartGrid');
+        const selectedMonth = document.getElementById('monthFilter').value;
+        grid.innerHTML = '';
+        charts.forEach(c => c.destroy());
+        charts = [];
+
+        if(currentMode === 'unit') {
+            for(let k in config) {
+                if(store[k] && store[k][currentFocus]) {
+                    const data = store[k][currentFocus];
+                    const filtered = selectedMonth === 'all' ? data : data.filter(d => d.month === selectedMonth);
+                    draw(grid, config[k].label, filtered, config[k].color);
+                }
+            }
+        } else {
+            for(let u in store[currentFocus]) {
+                const data = store[currentFocus][u];
+                const filtered = selectedMonth === 'all' ? data : data.filter(d => d.month === selectedMonth);
+                draw(grid, u, filtered, config[currentFocus].color);
+            }
+        }
+    }
+
+    function draw(container, title, filteredData, color) {
+        const div = document.createElement('div');
+        div.className = 'card-chart';
+        const canvasId = 'c-' + Math.random().toString(36).substr(2, 9);
+        div.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+        container.appendChild(div);
+
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        charts.push(new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: filteredData.map(d => d.date),
+                datasets: [{ 
+                    label: title, 
+                    data: filteredData.map(d => d.value), 
+                    borderColor: color, 
+                    backgroundColor: color + '20',
+                    fill: true, 
+                    pointRadius: 4,
+                    tension: 0.3 
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false },
+                    title: { display: true, text: title, font: { size: 16 } } 
+                },
+                scales: {
+                    y: { beginAtZero: false }
+                }
+            }
+        }));
+    }
+
+    init();
+</script>
+</body>
+</html>

@@ -7,46 +7,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f8fafc; font-family: sans-serif; display: flex; height: 100vh; margin: 0; }
-        
-        .sidebar { 
-            width: 250px; 
-            background: #c2410c; 
-            color: white; 
-            padding: 20px; 
-            overflow-y: auto; 
-            display: flex;
-            flex-direction: column;
-        }
-        
+        .sidebar { width: 250px; background: #c2410c; color: white; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
         .main { flex: 1; padding: 20px; overflow-y: auto; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
         .card-chart { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 350px; }
-        
-        .nav-link { 
-            color: #ffffff; 
-            cursor: pointer; 
-            display: block; 
-            padding: 10px; 
-            text-decoration: none; 
-            border-radius: 5px; 
-            margin-bottom: 5px;
-            transition: 0.3s;
-        }
+        .nav-link { color: #ffffff; cursor: pointer; display: block; padding: 10px; text-decoration: none; border-radius: 5px; margin-bottom: 5px; transition: 0.3s; }
         .nav-link:hover, .active { background: #9a3412; color: white; font-weight: bold; }
-        
         h4 { font-weight: bold; letter-spacing: 1px; margin-bottom: 25px; border-bottom: 1px solid #ea580c; padding-bottom: 10px; text-transform: uppercase; }
         h6 { color: #fdba74; font-size: 0.7rem; text-transform: uppercase; margin-top: 20px; margin-bottom: 10px; opacity: 0.8; }
-        
-        .filter-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
+        .filter-container { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         select.form-select { width: 220px; border-color: #c2410c; font-weight: bold; }
     </style>
 </head>
@@ -79,7 +48,7 @@
 </div>
 
 <script>
-    // COLOQUE SEUS LINKS CSV ABAIXO:
+    // --- INSIRA OS LINKS CSV ABAIXO ---
     const urls = {
         ativos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=0&single=true&output=csv",
         inadimplencia: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=1400644220&single=true&output=csv",
@@ -109,79 +78,53 @@
     async function init() {
         try {
             for (let k in urls) {
-                // Só tenta carregar se o link não for o texto padrão
                 if(!urls[k] || urls[k].includes("LINK_AQUI")) continue;
-                
                 const res = await fetch(urls[k]);
-                if (!res.ok) throw new Error("Falha no link: " + k);
+                if (!res.ok) throw new Error();
                 const text = await res.text();
                 store[k] = parse(text);
             }
-            
-            // Define a primeira unidade disponível para abrir o dashboard
-            const unidadesDisponiveis = Object.keys(store.ativos || {});
-            if(unidadesDisponiveis.length > 0) {
-                renderMenu();
-                updateMonthSelector();
-                setMode('unit', unidadesDisponiveis[0]);
-            } else {
-                document.getElementById('viewTitle').innerText = "Configure os links no código";
-            }
+            renderMenu();
+            updateMonthSelector();
+            const units = Object.keys(store.ativos || {});
+            if(units.length > 0) setMode('unit', units[0]);
         } catch (e) {
-            console.error(e);
             document.getElementById('viewTitle').innerText = "Erro ao carregar planilhas";
         }
     }
 
     function parse(csv) {
-        const rows = csv.trim().split('\n').map(r => r.split(','));
-        
-        // Linha 1 (Índice 0): Nome do Mês (Março, Abril...)
+        const lines = csv.trim().split('\n');
+        const rows = lines.map(line => line.split(','));
         const monthHeader = rows[0].slice(1).map(h => h.trim());
-        // Linha 2 (Índice 1): Data (01/03, 02/03...)
         const dateHeader = rows[1].slice(1).map(d => d.trim());
         
-        // Alimenta a lista única de meses para o filtro
-        monthHeader.forEach(m => {
-            if(m && m !== "" && !months.includes(m)) months.push(m);
-        });
+        monthHeader.forEach(m => { if(m && !months.includes(m)) months.push(m); });
 
         const obj = {};
-        // Começa na Linha 3 (Índice 2) onde estão os nomes das unidades e valores
-       rows.slice(2).forEach(r => {
-        const name = r[0] ? r[0].trim() : "";
-        
-        // Esta linha abaixo é o segredo: ela ignora linhas vazias ou de totais
-        if(!name || name === "" || name.toLowerCase().includes("total") || name.toLowerCase().includes("data")) return;
-        
-        obj[name] = r.slice(1).map((v, i) => {
-            // Aqui ele limpa os valores para o gráfico não bugar
-            let cleanValue = v ? v.replace(/[R$\s.]/g, '').replace(',', '.') : "0";
-            return {
-                month: monthHeader[i] || "Sem Mês",
+        rows.slice(2).forEach(r => {
+            const name = r[0] ? r[0].trim() : "";
+            if(!name || name.toLowerCase().includes("total") || name.toLowerCase() === "data") return;
+            obj[name] = r.slice(1).map((v, i) => ({
+                month: monthHeader[i] || "",
                 date: dateHeader[i] || "",
-                value: parseFloat(cleanValue) || 0
-            };
+                value: parseFloat(v.replace(/[R$\s.]/g, '').replace(',', '.')) || 0
+            }));
         });
-    });
         return obj;
     }
 
     function updateMonthSelector() {
         const select = document.getElementById('monthFilter');
         select.innerHTML = '<option value="all">Ver Tudo (Ano)</option>';
-        months.forEach(m => {
-            if(m) select.innerHTML += `<option value="${m}">${m}</option>`;
-        });
+        months.forEach(m => { if(m) select.innerHTML += `<option value="${m}">${m}</option>`; });
     }
 
     function renderMenu() {
         const div = document.getElementById('unitLinks');
         div.innerHTML = '';
-        // Usa a aba de Ativos como base para criar o menu de unidades
-        const unidades = Object.keys(store.ativos || {});
-        unidades.forEach(u => {
-            div.innerHTML += `<a class="nav-link unit-link" onclick="setMode('unit', '${u}')">${u}</a>`;
+        Object.keys(store.ativos || {}).forEach(u => {
+            div.innerHTML += `<a class="nav-link" onclick="setMode('unit', '${u}')">${u}</a>`;
         });
     }
 
@@ -189,15 +132,6 @@
         currentMode = mode;
         currentFocus = focus;
         document.getElementById('viewTitle').innerText = mode === 'unit' ? focus : config[focus].label;
-        
-        // Estética: Remove destaque de todos e coloca no selecionado
-        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-        // Busca o elemento que foi clicado ou o correspondente ao focus
-        const links = document.querySelectorAll('.nav-link');
-        links.forEach(l => {
-            if(l.innerText === focus || l.innerText === config[focus]?.label) l.classList.add('active');
-        });
-        
         render();
     }
 
@@ -208,20 +142,21 @@
         charts.forEach(c => c.destroy());
         charts = [];
 
-        if(currentMode === 'unit') {
-            for(let k in config) {
-                if(store[k] && store[k][currentFocus]) {
-                    const data = store[k][currentFocus];
-                    const filtered = selectedMonth === 'all' ? data : data.filter(d => d.month === selectedMonth);
-                    draw(grid, config[k].label, filtered, config[k].color);
-                }
+        const dataSrc = currentMode === 'unit' ? config : store[currentFocus];
+        for(let k in dataSrc) {
+            let label, data, color;
+            if(currentMode === 'unit') {
+                if(!store[k] || !store[k][currentFocus]) continue;
+                label = config[k].label;
+                data = store[k][currentFocus];
+                color = config[k].color;
+            } else {
+                label = k;
+                data = store[currentFocus][k];
+                color = config[currentFocus].color;
             }
-        } else {
-            for(let u in store[currentFocus]) {
-                const data = store[currentFocus][u];
-                const filtered = selectedMonth === 'all' ? data : data.filter(d => d.month === selectedMonth);
-                draw(grid, u, filtered, config[currentFocus].color);
-            }
+            const filtered = selectedMonth === 'all' ? data : data.filter(d => d.month === selectedMonth);
+            draw(grid, label, filtered, color);
         }
     }
 
@@ -231,36 +166,16 @@
         const canvasId = 'c-' + Math.random().toString(36).substr(2, 9);
         div.innerHTML = `<canvas id="${canvasId}"></canvas>`;
         container.appendChild(div);
-
         const ctx = document.getElementById(canvasId).getContext('2d');
         charts.push(new Chart(ctx, {
             type: 'line',
             data: {
                 labels: filteredData.map(d => d.date),
-                datasets: [{ 
-                    label: title, 
-                    data: filteredData.map(d => d.value), 
-                    borderColor: color, 
-                    backgroundColor: color + '20',
-                    fill: true, 
-                    pointRadius: 4,
-                    tension: 0.3 
-                }]
+                datasets: [{ label: title, data: filteredData.map(d => d.value), borderColor: color, backgroundColor: color + '20', fill: true, tension: 0.3 }]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false },
-                    title: { display: true, text: title, font: { size: 16 } } 
-                },
-                scales: {
-                    y: { beginAtZero: false }
-                }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: title } } }
         }));
     }
-
     init();
 </script>
 </body>

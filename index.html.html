@@ -16,7 +16,6 @@
         h4 { font-weight: bold; letter-spacing: 1px; margin-bottom: 25px; border-bottom: 1px solid #ea580c; padding-bottom: 10px; text-transform: uppercase; }
         h6 { color: #fdba74; font-size: 0.7rem; text-transform: uppercase; margin-top: 20px; margin-bottom: 10px; opacity: 0.8; }
         .filter-container { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        select.form-select { width: 220px; border-color: #c2410c; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -39,16 +38,13 @@
 
 <div class="main">
     <div class="filter-container">
-        <h2 id="viewTitle" style="margin: 0; font-size: 1.5rem; color: #1e293b;">Carregando...</h2>
-        <select id="monthFilter" class="form-select" onchange="render()">
-            <option value="all">Ver Tudo (Ano)</option>
-        </select>
+        <h2 id="viewTitle" style="margin: 0; font-size: 1.5rem; color: #1e293b;">Aguardando Dados...</h2>
+        <select id="monthFilter" class="form-select" style="width: 200px" onchange="render()"></select>
     </div>
     <div id="chartGrid" class="grid"></div>
 </div>
 
 <script>
-    // --- INSIRA OS LINKS CSV ABAIXO ---
     const urls = {
         ativos: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=0&single=true&output=csv",
         inadimplencia: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoovU4okOKo3iqJ9aR211qunKGCOPEQDp86hiYegnp44Qgm3V_1xuN-aqXu1R0W2vpz2Tydfn-uwWF/pub?gid=1400644220&single=true&output=csv",
@@ -78,76 +74,52 @@
     async function init() {
         try {
             for (let k in urls) {
-                if(!urls[k] || urls[k].includes("LINK_AQUI")) continue;
                 const res = await fetch(urls[k]);
-                if (!res.ok) throw new Error();
                 const text = await res.text();
-                store[k] = parse(text);
+                store[k] = parseCSV(text);
             }
-            renderMenu();
-            updateMonthSelector();
-            const units = Object.keys(store.ativos || {});
-            if(units.length > 0) setMode('unit', units[0]);
+            buildMenu();
+            setMode('unit', Object.keys(store.ativos)[0]);
         } catch (e) {
-            document.getElementById('viewTitle').innerText = "Erro ao carregar planilhas";
+            document.getElementById('viewTitle').innerText = "Erro na conexão com Google Sheets";
         }
     }
 
-    function parse(csv) {
-    const lines = csv.trim().split('\n');
-    if (lines.length < 2) return {};
-
-    // Detecta o separador: conta quantas vírgulas vs ponto-e-vírgulas existem na primeira linha
-    const commaCount = (lines[0].match(/,/g) || []).length;
-    const semiCount = (lines[0].match(/;/g) || []).length;
-    const sep = semiCount > commaCount ? ';' : ',';
-
-    const rows = lines.map(line => line.split(sep));
-    
-    // Captura os cabeçalhos das linhas 1 e 2
-    const monthHeader = rows[0].slice(1).map(h => h.trim());
-    const dateHeader = rows[1].slice(1).map(d => d.trim());
-    
-    monthHeader.forEach(m => { 
-        if(m && m !== "" && !months.includes(m)) months.push(m); 
-    });
-
-    const obj = {};
-    // Lê as unidades a partir da Linha 3
-    rows.slice(2).forEach(r => {
-        let name = r[0] ? r[0].trim() : "";
+    function parseCSV(csv) {
+        const lines = csv.trim().split('\n');
+        // Detecta se o CSV usa vírgula ou ponto e vírgula
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const rows = lines.map(l => l.split(sep));
         
-        // Ignora linhas de total, data ou vazias
-        if(!name || name.toLowerCase().includes("total") || name.toLowerCase() === "data") return;
+        const mHead = rows[0].slice(1).map(h => h.trim());
+        const dHead = rows[1].slice(1).map(d => d.trim());
         
-        obj[name] = r.slice(1).map((v, i) => {
-            if (!v) return { month: monthHeader[i] || "", date: dateHeader[i] || "", value: 0 };
+        mHead.forEach(m => { if(m && !months.includes(m)) months.push(m); });
+
+        const data = {};
+        rows.slice(2).forEach(r => {
+            const name = r[0] ? r[0].trim() : "";
+            if(!name || name.toLowerCase().includes("total") || name.toLowerCase().includes("data")) return;
             
-            // Limpa R$, espaços e converte formato decimal (ex: 1.200,50 -> 1200.50)
-            let val = v.replace(/[R$\s]/g, '');
-            if (val.includes(',') && val.includes('.')) val = val.replace(/\./g, '').replace(',', '.');
-            else val = val.replace(',', '.');
-
-            return {
-                month: monthHeader[i] || "",
-                date: dateHeader[i] || "",
-                value: parseFloat(val) || 0
-            };
+            data[name] = r.slice(1).map((v, i) => {
+                // Limpeza de números brasileiros (1.200,50 -> 1200.50)
+                let clean = v.replace(/[R$\s]/g, '');
+                if(clean.includes(',') && clean.includes('.')) clean = clean.replace(/\./g, '').replace(',', '.');
+                else clean = clean.replace(',', '.');
+                
+                return { month: mHead[i], date: dHead[i], value: parseFloat(clean) || 0 };
+            });
         });
-    });
-    return obj;
-}
-
-    function updateMonthSelector() {
-        const select = document.getElementById('monthFilter');
-        select.innerHTML = '<option value="all">Ver Tudo (Ano)</option>';
-        months.forEach(m => { if(m) select.innerHTML += `<option value="${m}">${m}</option>`; });
+        return data;
     }
 
-    function renderMenu() {
+    function buildMenu() {
+        const sel = document.getElementById('monthFilter');
+        sel.innerHTML = '<option value="all">Ver Tudo (Ano)</option>';
+        months.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
+
         const div = document.getElementById('unitLinks');
-        div.innerHTML = '';
-        Object.keys(store.ativos || {}).forEach(u => {
+        Object.keys(store.ativos).forEach(u => {
             div.innerHTML += `<a class="nav-link" onclick="setMode('unit', '${u}')">${u}</a>`;
         });
     }
@@ -161,43 +133,40 @@
 
     function render() {
         const grid = document.getElementById('chartGrid');
-        const selectedMonth = document.getElementById('monthFilter').value;
+        const filter = document.getElementById('monthFilter').value;
         grid.innerHTML = '';
         charts.forEach(c => c.destroy());
         charts = [];
 
-        const dataSrc = currentMode === 'unit' ? config : store[currentFocus];
-        for(let k in dataSrc) {
-            let label, data, color;
-            if(currentMode === 'unit') {
-                if(!store[k] || !store[k][currentFocus]) continue;
-                label = config[k].label;
-                data = store[k][currentFocus];
-                color = config[k].color;
-            } else {
-                label = k;
-                data = store[currentFocus][k];
-                color = config[currentFocus].color;
+        if(currentMode === 'unit') {
+            for(let k in config) {
+                if(store[k][currentFocus]) {
+                    const d = filter === 'all' ? store[k][currentFocus] : store[k][currentFocus].filter(x => x.month === filter);
+                    draw(grid, config[k].label, d, config[k].color);
+                }
             }
-            const filtered = selectedMonth === 'all' ? data : data.filter(d => d.month === selectedMonth);
-            draw(grid, label, filtered, color);
+        } else {
+            for(let u in store[currentFocus]) {
+                const d = filter === 'all' ? store[currentFocus][u] : store[currentFocus][u].filter(x => x.month === filter);
+                draw(grid, u, d, config[currentFocus].color);
+            }
         }
     }
 
-    function draw(container, title, filteredData, color) {
+    function draw(container, title, data, color) {
         const div = document.createElement('div');
         div.className = 'card-chart';
-        const canvasId = 'c-' + Math.random().toString(36).substr(2, 9);
-        div.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+        const id = 'c' + Math.random().toString(36).substr(2, 5);
+        div.innerHTML = `<canvas id="${id}"></canvas>`;
         container.appendChild(div);
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        charts.push(new Chart(ctx, {
+
+        charts.push(new Chart(document.getElementById(id), {
             type: 'line',
             data: {
-                labels: filteredData.map(d => d.date),
-                datasets: [{ label: title, data: filteredData.map(d => d.value), borderColor: color, backgroundColor: color + '20', fill: true, tension: 0.3 }]
+                labels: data.map(x => x.date),
+                datasets: [{ label: title, data: data.map(x => x.value), borderColor: color, backgroundColor: color+'20', fill: true, tension: 0.3 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: title } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: title } } }
         }));
     }
     init();

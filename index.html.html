@@ -38,8 +38,10 @@
 
 <div class="main">
     <div class="filter-container">
-        <h2 id="viewTitle" style="margin: 0; font-size: 1.5rem; color: #1e293b;">Aguardando Dados...</h2>
-        <select id="monthFilter" class="form-select" style="width: 200px" onchange="render()"></select>
+        <h2 id="viewTitle" style="margin: 0; font-size: 1.5rem; color: #1e293b;">Carregando...</h2>
+        <select id="monthFilter" class="form-select" style="width: 220px;" onchange="render()">
+            <option value="all">Ver Tudo (Ano)</option>
+        </select>
     </div>
     <div id="chartGrid" class="grid"></div>
 </div>
@@ -75,19 +77,20 @@
         try {
             for (let k in urls) {
                 const res = await fetch(urls[k]);
+                if (!res.ok) throw new Error();
                 const text = await res.text();
-                store[k] = parseCSV(text);
+                store[k] = parse(text);
             }
             buildMenu();
-            setMode('unit', Object.keys(store.ativos)[0]);
+            const firstUnit = Object.keys(store.ativos || {})[0];
+            if(firstUnit) setMode('unit', firstUnit);
         } catch (e) {
-            document.getElementById('viewTitle').innerText = "Erro na conexão com Google Sheets";
+            document.getElementById('viewTitle').innerText = "Erro ao carregar dados";
         }
     }
 
-    function parseCSV(csv) {
+    function parse(csv) {
         const lines = csv.trim().split('\n');
-        // Detecta se o CSV usa vírgula ou ponto e vírgula
         const sep = lines[0].includes(';') ? ';' : ',';
         const rows = lines.map(l => l.split(sep));
         
@@ -99,15 +102,10 @@
         const data = {};
         rows.slice(2).forEach(r => {
             const name = r[0] ? r[0].trim() : "";
-            if(!name || name.toLowerCase().includes("total") || name.toLowerCase().includes("data")) return;
-            
+            if(!name || name.toLowerCase().includes("total") || name.toLowerCase() === "data") return;
             data[name] = r.slice(1).map((v, i) => {
-                // Limpeza de números brasileiros (1.200,50 -> 1200.50)
-                let clean = v.replace(/[R$\s]/g, '');
-                if(clean.includes(',') && clean.includes('.')) clean = clean.replace(/\./g, '').replace(',', '.');
-                else clean = clean.replace(',', '.');
-                
-                return { month: mHead[i], date: dHead[i], value: parseFloat(clean) || 0 };
+                let clean = v ? v.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.') : "0";
+                return { month: mHead[i] || "", date: dHead[i] || "", value: parseFloat(clean) || 0 };
             });
         });
         return data;
@@ -115,11 +113,10 @@
 
     function buildMenu() {
         const sel = document.getElementById('monthFilter');
-        sel.innerHTML = '<option value="all">Ver Tudo (Ano)</option>';
-        months.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
-
+        months.forEach(m => { if(m) sel.innerHTML += `<option value="${m}">${m}</option>`; });
         const div = document.getElementById('unitLinks');
-        Object.keys(store.ativos).forEach(u => {
+        div.innerHTML = '';
+        Object.keys(store.ativos || {}).forEach(u => {
             div.innerHTML += `<a class="nav-link" onclick="setMode('unit', '${u}')">${u}</a>`;
         });
     }
@@ -140,7 +137,7 @@
 
         if(currentMode === 'unit') {
             for(let k in config) {
-                if(store[k][currentFocus]) {
+                if(store[k] && store[k][currentFocus]) {
                     const d = filter === 'all' ? store[k][currentFocus] : store[k][currentFocus].filter(x => x.month === filter);
                     draw(grid, config[k].label, d, config[k].color);
                 }
@@ -156,17 +153,16 @@
     function draw(container, title, data, color) {
         const div = document.createElement('div');
         div.className = 'card-chart';
-        const id = 'c' + Math.random().toString(36).substr(2, 5);
-        div.innerHTML = `<canvas id="${id}"></canvas>`;
+        const canvasId = 'c' + Math.random().toString(36).substr(2, 5);
+        div.innerHTML = `<canvas id="${canvasId}"></canvas>`;
         container.appendChild(div);
-
-        charts.push(new Chart(document.getElementById(id), {
+        charts.push(new Chart(document.getElementById(canvasId), {
             type: 'line',
             data: {
                 labels: data.map(x => x.date),
                 datasets: [{ label: title, data: data.map(x => x.value), borderColor: color, backgroundColor: color+'20', fill: true, tension: 0.3 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: title } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: title } } }
         }));
     }
     init();

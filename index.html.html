@@ -86,12 +86,12 @@
             <div class="kpi-value" id="topAtivos">0</div>
         </div>
         <div class="kpi-card" style="border-left-color: #f43f5e;">
-            <div class="kpi-label">Inadimplência</div>
-            <div class="kpi-value" id="topInad">0</div>
+            <div class="kpi-label">Inadimplência Regional</div>
+            <div class="kpi-value" id="topInad">R$ 0,00</div>
         </div>
         <div class="kpi-card" style="border-left-color: #10b981;">
             <div class="kpi-label">Faturamento</div>
-            <div class="kpi-value" id="topFat">0</div>
+            <div class="kpi-value" id="topFat">R$ 0,00</div>
         </div>
     </div>
 
@@ -115,4 +115,24 @@
         vendas: { label: "Vendas", color: "#10b981" },
         faturamento: { label: "Faturamento", color: "#f59e0b" },
         cancelamentos: { label: "Cancelamentos", color: "#8b5cf6" },
-        visitas: { label: "Visitas
+        visitas: { label: "Visitas", color: "#64748b" },
+        nps: { label: "NPS", color: "#06b6d4" }
+    };
+
+    let store = {};
+    let months = [];
+    let currentMode = 'unit';
+    let currentFocus = '';
+    let charts = [];
+
+    async function init() {
+        try {
+            for (let k in urls) {
+                const res = await fetch(urls[k]);
+                const text = await res.text();
+                store[k] = parse(text);
+            }
+            buildMenu();
+            const firstUnit = Object.keys(store.ativos || {})[0];
+            if(firstUnit) setMode('unit', firstUnit);
+        } catch (e) {

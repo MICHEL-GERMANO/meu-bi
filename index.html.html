@@ -84,8 +84,8 @@
 
     <div class="kpi-container">
         <div class="kpi-card">
-            <div class="kpi-label">Ativos Totais</div>
-            <div class="kpi-value" id="topAtivos">0</div>
+    <div class="kpi-label">Ativos Adimplentes</div> <div class="kpi-value" id="topAtivos">0</div>
+</div>
         </div>
         <div class="kpi-card" style="border-left-color: #f43f5e;">
             <div class="kpi-label">Inadimplência</div>
@@ -205,13 +205,20 @@
     }
 
     function updateTopCards(filter) {
-        const calculateTotal = (key) => {
-            let total = 0;
-            for(let u in store[key]) {
-                const data = filter === 'all' ? store[key][u] : store[key][u].filter(x => x.month === filter);
-                if(data.length > 0) total += data[data.length - 1].value;
-            }
-            return total;
+    const calculateTotal = (key) => {
+        let total = 0;
+        for(let u in store[key]) {
+            const data = filter === 'all' ? store[key][u] : store[key][u].filter(x => x.month === filter);
+            // O código pega o último valor disponível para a unidade no período
+            if(data.length > 0) total += data[data.length - 1].value;
+        }
+        return total;
+    };
+
+    // Atualiza o valor no novo quadro "Ativos Adimplentes"
+    document.getElementById('topAtivos').innerText = calculateTotal('ativos').toLocaleString('pt-BR');
+    // ... restante dos KPIs
+}
         };
 
         document.getElementById('topAtivos').innerText = calculateTotal('ativos').toLocaleString('pt-BR');

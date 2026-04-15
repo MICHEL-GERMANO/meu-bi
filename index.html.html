@@ -152,23 +152,34 @@
         }
     }
 
-    function updateTopCards(filter) {
+   function updateTopCards(filter) {
     const calc = (key) => {
-        let total = 0;
-        for(let u in store[key]) {
-            const unitData = filter === 'all' ? store[key][u] : store[key][u].filter(x => x.month === filter);
-            
-            // FILTRO NOVO: Encontra o último valor preenchido que seja maior que zero
-            // Isso evita que o sistema pegue as células vazias do final do mês
-            const preenchidos = unitData.filter(d => d.value > 0);
-            if(preenchidos.length > 0) {
-                total += preenchidos[preenchidos.length - 1].value;
+        let totalGeral = 0;
+        const todasUnidades = Object.keys(store[key] || {});
+        
+        // 1. Descobrir qual a última data que tem QUALQUER valor preenchido na regional
+        let todasDatas = [];
+        todasUnidades.forEach(u => {
+            store[key][u].forEach(d => {
+                if (d.value > 0) todasDatas.push(d.date);
+            });
+        });
+        
+        if (todasDatas.length === 0) return 0;
+        const ultimaDataReal = todasDatas[todasDatas.length - 1];
+
+        // 2. Somar o valor de todas as unidades APENAS naquela data específica
+        todasUnidades.forEach(u => {
+            const registro = store[key][u].find(d => d.date === ultimaDataReal);
+            if (registro) {
+                totalGeral += registro.value;
             }
-        }
-        return total;
+        });
+        
+        return totalGeral;
     };
 
-    // Atualiza os cartões com a soma real
+    // Atualiza os cartões com os valores exatos da última atualização
     document.getElementById('topAtivos').innerText = calc('ativos').toLocaleString('pt-BR');
     document.getElementById('topInad').innerText = calc('inadimplencia').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     document.getElementById('topFat').innerText = calc('faturamento').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

@@ -15,8 +15,8 @@
         .kpi-card { background: var(--card-dark); padding: 20px; border-radius: 12px; border-left: 4px solid var(--neon-blue); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
         .kpi-label { color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
         .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 5px 0; color: #fff; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; }
-        .card-chart { background: var(--card-dark); padding: 20px; border-radius: 12px; height: 380px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; }
+        .card-chart { background: var(--card-dark); padding: 20px; border-radius: 12px; height: 420px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
         .nav-link { color: rgba(255,255,255,0.8); cursor: pointer; display: block; padding: 10px; text-decoration: none; border-radius: 8px; margin-bottom: 5px; transition: 0.2s; font-size: 0.9rem; }
         .nav-link:hover, .active { background: #9a3412; color: white; font-weight: 600; }
         select.form-select { background-color: var(--card-dark); color: white; border: 1px solid #334155; }
@@ -65,9 +65,9 @@
 
     const config = {
         ativos: { label: "Ativos Adimplentes", color: "#0ea5e9", fill: false },
-        inadimplencia: { label: "Inadimplência", color: "#f43f5e", fill: false }, // Gráfico de Linha simples
+        inadimplencia: { label: "Inadimplência", color: "#f43f5e", fill: false },
         vendas: { label: "Vendas", color: "#10b981", fill: false },
-        faturamento: { label: "Faturamento de Vendas", color: "#f59e0b", fill: true }, // Gráfico de Área
+        faturamento: { label: "Faturamento de Vendas", color: "#f59e0b", fill: true },
         cancelamentos: { label: "Cancelamentos", color: "#8b5cf6", fill: false },
         visitas: { label: "Visitas", color: "#64748b", fill: false },
         nps: { label: "NPS", color: "#06b6d4", fill: false }
@@ -102,7 +102,7 @@
             const name = r[0]?.trim();
             if(!name || name.toLowerCase().includes("total")) return;
             data[name] = r.slice(1).map((v, i) => {
-                let clean = v ? v.replace(/[R$\s.]/g, '').replace(',', '.') : "0";
+                let clean = v ? v.replace(/R\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.') : "0";
                 return { month: mHead[i] || "", date: dHead[i] || "", value: parseFloat(clean) || 0 };
             });
         });
@@ -124,7 +124,8 @@
     function setMode(mode, focus) {
         currentMode = mode;
         currentFocus = focus;
-        document.getElementById('viewTitle').innerText = mode === 'unit' ? focus : config[focus].label;
+        const label = mode === 'unit' ? focus : (config[focus] ? config[focus].label : focus);
+        document.getElementById('viewTitle').innerText = label;
         render();
     }
 
@@ -152,44 +153,58 @@
         }
     }
 
-   function updateTopCards(filter) {
-    const calc = (key) => {
-        let totalGeral = 0;
-        const todasUnidades = Object.keys(store[key] || {});
-        
-        // 1. Descobrir qual a última data que tem QUALQUER valor preenchido na regional
-        let todasDatas = [];
-        todasUnidades.forEach(u => {
-            store[key][u].forEach(d => {
-                if (d.value > 0) todasDatas.push(d.date);
+    function updateTopCards(filter) {
+        const calc = (key) => {
+            let totalGeral = 0;
+            const unidades = Object.keys(store[key] || {});
+            if (unidades.length === 0) return 0;
+
+            let todasDatas = [];
+            unidades.forEach(u => {
+                store[key][u].forEach(d => { if (d.value > 0) todasDatas.push(d.date); });
             });
-        });
-        
-        if (todasDatas.length === 0) return 0;
-        const ultimaDataReal = todasDatas[todasDatas.length - 1];
 
-        // 2. Somar o valor de todas as unidades APENAS naquela data específica
-        todasUnidades.forEach(u => {
-            const registro = store[key][u].find(d => d.date === ultimaDataReal);
-            if (registro) {
-                totalGeral += registro.value;
-            }
-        });
-        
-        return totalGeral;
-    };
+            if (todasDatas.length === 0) return 0;
+            const ultimaDataReal = todasDatas[todasDatas.length - 1];
 
-    // Atualiza os cartões com os valores exatos da última atualização
-    document.getElementById('topAtivos').innerText = calc('ativos').toLocaleString('pt-BR');
-    document.getElementById('topInad').innerText = calc('inadimplencia').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    document.getElementById('topFat').innerText = calc('faturamento').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+            unidades.forEach(u => {
+                const registro = store[key][u].find(d => d.date === ultimaDataReal);
+                if (registro) totalGeral += registro.value;
+            });
+            return totalGeral;
+        };
+
+        document.getElementById('topAtivos').innerText = calc('ativos').toLocaleString('pt-BR');
+        document.getElementById('topInad').innerText = calc('inadimplencia').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        document.getElementById('topFat').innerText = calc('faturamento').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
 
     function draw(container, title, data, color, fill) {
         const div = document.createElement('div');
         div.className = 'card-chart';
+        
+        const validData = data.filter(d => d.value > 0);
+        const lastValue = validData.length > 0 ? validData[validData.length - 1].value : 0;
+        
+        const isCurrency = title.toLowerCase().includes('faturamento') || title.toLowerCase().includes('inadimplência');
+        const displayValue = isCurrency 
+            ? lastValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            : lastValue.toLocaleString('pt-BR');
+
         const id = 'c' + Math.random().toString(36).substr(2, 5);
-        div.innerHTML = `<canvas id="${id}"></canvas>`;
+        
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div>
+                    <span style="color: #94a3b8; font-size: 0.75rem; text-transform: uppercase;">${title}</span>
+                    <div style="color: white; font-size: 1.4rem; font-weight: 700;">${displayValue}</div>
+                </div>
+                <div style="width: 12px; height: 12px; border-radius: 50%; background: ${color}; margin-top: 5px;"></div>
+            </div>
+            <div style="height: calc(100% - 50px);">
+                <canvas id="${id}"></canvas>
+            </div>
+        `;
         container.appendChild(div);
 
         const ctx = document.getElementById(id).getContext('2d');
@@ -208,12 +223,8 @@
                 }]
             },
             options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                plugins: { 
-                    legend: { display: false }, 
-                    title: { display: true, text: title, color: '#94a3b8' } 
-                },
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { legend: { display: false } },
                 scales: {
                     y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } },
                     x: { ticks: { color: '#64748b' }, grid: { display: false } }

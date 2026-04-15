@@ -153,21 +153,26 @@
     }
 
     function updateTopCards(filter) {
-        const calc = (key) => {
-            let total = 0;
-            for(let u in store[key]) {
-                const unitData = filter === 'all' ? store[key][u] : store[key][u].filter(x => x.month === filter);
-                if(unitData.length > 0) {
-                    total += unitData[unitData.length - 1].value;
-                }
+    const calc = (key) => {
+        let total = 0;
+        for(let u in store[key]) {
+            const unitData = filter === 'all' ? store[key][u] : store[key][u].filter(x => x.month === filter);
+            
+            // FILTRO NOVO: Encontra o último valor preenchido que seja maior que zero
+            // Isso evita que o sistema pegue as células vazias do final do mês
+            const preenchidos = unitData.filter(d => d.value > 0);
+            if(preenchidos.length > 0) {
+                total += preenchidos[preenchidos.length - 1].value;
             }
-            return total;
-        };
+        }
+        return total;
+    };
 
-        document.getElementById('topAtivos').innerText = calc('ativos').toLocaleString('pt-BR');
-        document.getElementById('topInad').innerText = calc('inadimplencia').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        document.getElementById('topFat').innerText = calc('faturamento').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
+    // Atualiza os cartões com a soma real
+    document.getElementById('topAtivos').innerText = calc('ativos').toLocaleString('pt-BR');
+    document.getElementById('topInad').innerText = calc('inadimplencia').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    document.getElementById('topFat').innerText = calc('faturamento').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
     function draw(container, title, data, color, fill) {
         const div = document.createElement('div');
